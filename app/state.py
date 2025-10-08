@@ -53,7 +53,7 @@ class OBDState(rx.State):
     is_watching_live: bool = False
     session_log: list[str] = []
     _connection: obd.Async | None = None
-    _use_mock_data: bool = True
+    _use_mock_data: bool = False
 
     @rx.var
     def is_connected(self) -> bool:
