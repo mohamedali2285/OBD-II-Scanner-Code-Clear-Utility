@@ -99,6 +99,12 @@ class OBDState(rx.State):
             self.connection_status = "CONNECTING"
             self.connection_error = ""
             self._log_message(f"Attempting to connect to {self.selected_port}...")
+        if not self.selected_port:
+            async with self:
+                self.connection_status = "ERROR"
+                self.connection_error = "No port selected."
+                self._log_message("ERROR: No port selected.")
+            return
         if self._use_mock_data:
             await asyncio.sleep(2)
             async with self:
@@ -111,11 +117,11 @@ class OBDState(rx.State):
             connection = obd.Async(self.selected_port)
             async with self:
                 self._connection = connection
-            await asyncio.to_thread(connection.watch, obd.commands.RPM)
-            await asyncio.to_thread(connection.start)
+            await asyncio.to_thread(self._connection.watch, obd.commands.RPM)
+            await asyncio.to_thread(self._connection.start)
             await asyncio.sleep(3)
-            if connection.status() == obd.OBDStatus.CAR_CONNECTED:
-                vin_cmd = await connection.query(obd.commands.VIN)
+            if self._connection.status() == obd.OBDStatus.CAR_CONNECTED:
+                vin_cmd = await self._connection.query(obd.commands.VIN)
                 async with self:
                     self.connection_status = "CONNECTED"
                     self.vin = vin_cmd.value if not vin_cmd.is_null else "N/A"
@@ -123,7 +129,19 @@ class OBDState(rx.State):
                         f"Successfully connected to vehicle. VIN: {self.vin}"
                     )
             else:
-                raise Exception(f"Connection failed. Status: {connection.status()}")
+                raise Exception(
+                    f"Connection failed. Status: {self._connection.status()}"
+                )
+        except serial.SerialException as e:
+            logging.exception(e)
+            async with self:
+                self.connection_status = "ERROR"
+                self.connection_error = f"Serial Port Error: {e}. Ensure adapter is connected and port is correct."
+                self._log_message(f"ERROR: {self.connection_error}")
+            if self._connection:
+                await asyncio.to_thread(self._connection.close)
+            async with self:
+                self._connection = None
         except Exception as e:
             logging.exception(e)
             async with self:
@@ -244,27 +262,27 @@ class OBDState(rx.State):
     def _update_live_data(self, response):
         if not response.is_null:
             key = response.command.name
-            self.live_data[key] = {
-                "name": response.command.name.replace("_", " ").title(),
-                "value": response.value.magnitude
-                if hasattr(response.value, "magnitude")
-                else response.value,
-                "unit": str(response.value.units)
-                if hasattr(response.value, "units")
-                else "",
-            }
+            asyncio.run(self.async_update_live_data(key, response))
+
+    @rx.event
+    async def async_update_live_data(self, key, response):
+        self.live_data[key] = {
+            "name": response.command.name.replace("_", " ").title(),
+            "value": response.value.magnitude
+            if hasattr(response.value, "magnitude")
+            else response.value,
+            "unit": str(response.value.units)
+            if hasattr(response.value, "units")
+            else "",
+        }
 
     @rx.event(background=True)
     async def toggle_live_watch(self):
-        if self._use_mock_data and (not self.is_watching_live):
+        if self._use_mock_data:
             async with self:
-                self.is_watching_live = True
-                self._log_message("Started live data watch (Mock).")
-            return
-        elif self._use_mock_data and self.is_watching_live:
-            async with self:
-                self.is_watching_live = False
-                self._log_message("Stopped live data watch (Mock).")
+                self.is_watching_live = not self.is_watching_live
+                status = "Started" if self.is_watching_live else "Stopped"
+                self._log_message(f"{status} live data watch (Mock).")
             return
         if not self.is_connected or not self._connection:
             yield rx.toast.error("Not connected to vehicle.")
