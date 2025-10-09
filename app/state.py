@@ -115,7 +115,7 @@ class OBDState(rx.State):
                 self.live_data = MOCK_LIVE_DATA
             return
         try:
-            connection = obd.Async(self.selected_port)
+            connection = await asyncio.to_thread(obd.Async, self.selected_port)
             async with self:
                 self._connection = connection
             await asyncio.to_thread(self._connection.watch, obd.commands.RPM)
@@ -219,7 +219,7 @@ class OBDState(rx.State):
     async def clear_dtcs(self):
         async with self:
             if not self.clear_confirmation_valid:
-                yield rx.toast.error("Invalid confirmation text.")
+                yield rx.toast("Invalid confirmation text.", duration=3000)
                 return
             self.is_clearing_codes = True
             self._log_message("Attempting to clear DTCs...")
@@ -230,7 +230,7 @@ class OBDState(rx.State):
                 self._log_message("Mock DTCs cleared.")
                 self.is_clearing_codes = False
                 self.show_clear_dialog = False
-            yield rx.toast.success("Codes Cleared (Mock Mode)")
+            yield rx.toast("Codes Cleared (Mock Mode)", duration=3000)
             return
         if self.is_connected and self._connection:
             try:
@@ -239,18 +239,18 @@ class OBDState(rx.State):
                     async with self:
                         self.dtc_codes.clear()
                         self._log_message("CLEAR_DTC command successful.")
-                    yield rx.toast.success("Diagnostic Trouble Codes Cleared")
+                    yield rx.toast("Diagnostic Trouble Codes Cleared", duration=3000)
                 else:
                     async with self:
                         self._log_message(
                             f"CLEAR_DTC command failed. Response: {response.value}"
                         )
-                    yield rx.toast.error("Failed to clear codes.")
+                    yield rx.toast("Failed to clear codes.", duration=3000)
             except Exception as e:
                 logging.exception(e)
                 async with self:
                     self._log_message(f"Error clearing DTCs: {e}")
-                yield rx.toast.error(f"Error: {e}")
+                yield rx.toast(f"Error: {e}", duration=3000)
             finally:
                 async with self:
                     self.is_clearing_codes = False
@@ -286,7 +286,7 @@ class OBDState(rx.State):
                 self._log_message(f"{status} live data watch (Mock).")
             return
         if not self.is_connected or not self._connection:
-            yield rx.toast.error("Not connected to vehicle.")
+            yield rx.toast("Not connected to vehicle.", duration=3000)
             return
         if self.is_watching_live:
             await asyncio.to_thread(self._connection.unwatch_all)

@@ -109,7 +109,9 @@ def dtc_scanner() -> rx.Component:
             rx.cond(
                 OBDState.is_scanning_dtcs,
                 rx.el.div(
-                    rx.spinner(class_name="text-purple-600"),
+                    rx.el.div(
+                        class_name="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"
+                    ),
                     rx.el.p("Scanning...", class_name="ml-2 text-gray-500"),
                     class_name="flex items-center justify-center h-32",
                 ),
