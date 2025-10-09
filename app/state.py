@@ -3,6 +3,7 @@ from typing import TypedDict
 import asyncio
 import obd
 import serial.tools.list_ports
+from serial.serialutil import SerialException
 import logging
 from datetime import datetime
 
@@ -132,7 +133,7 @@ class OBDState(rx.State):
                 raise Exception(
                     f"Connection failed. Status: {self._connection.status()}"
                 )
-        except serial.SerialException as e:
+        except SerialException as e:
             logging.exception(e)
             async with self:
                 self.connection_status = "ERROR"

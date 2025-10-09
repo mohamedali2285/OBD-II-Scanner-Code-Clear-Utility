@@ -47,20 +47,30 @@ def connection_manager() -> rx.Component:
                             class_name="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md shadow-sm",
                         ),
                         rx.el.button(
-                            rx.icon("refresh-cw", size=16),
+                            rx.cond(
+                                OBDState.is_scanning_ports,
+                                rx.el.div(
+                                    class_name="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"
+                                ),
+                                rx.icon("refresh-cw", size=16),
+                            ),
                             on_click=OBDState.scan_for_ports,
-                            is_loading=OBDState.is_scanning_ports,
-                            class_name="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 ml-2",
+                            disabled=OBDState.is_scanning_ports,
+                            class_name="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 ml-2 disabled:opacity-50",
                         ),
                         class_name="flex items-center",
                     ),
                     class_name="mb-4",
                 ),
                 rx.el.button(
-                    "Connect",
+                    rx.cond(
+                        OBDState.connection_status == "CONNECTING",
+                        "Connecting...",
+                        "Connect",
+                    ),
                     on_click=OBDState.connect_to_adapter,
-                    is_loading=OBDState.connection_status == "CONNECTING",
-                    class_name="w-full bg-purple-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-purple-700 shadow-md elevation-3 transition-all duration-300",
+                    disabled=OBDState.connection_status == "CONNECTING",
+                    class_name="w-full bg-purple-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-purple-700 shadow-md elevation-3 transition-all duration-300 disabled:opacity-50",
                 ),
             ),
             rx.el.button(
